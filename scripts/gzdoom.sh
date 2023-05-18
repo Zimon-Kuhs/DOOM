@@ -25,13 +25,14 @@ check () {
     if [ -z "$2" ]; then
         error "$1 expects an argument."
     fi
+    echo "$2"
 }
 
 isExtension() {
-    file="(basename $1)"
+    file="$(basename "$1")"
 
     for extension in ${*:2}; do
-        if [ "$(basename "$file" $extension)" = "$file" ]; then
+        if [[ $file == *$extension ]]; then
             echo true
         fi
     done
@@ -52,7 +53,6 @@ files=""
 iwad="DOOM2"
 map="01"
 skill="4"
-target=""
 tester=""
 verbose=false
 
@@ -80,7 +80,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -t) tester="$(check "$opt" "$param")"
             ;;
-        v)  verbose=true
+        -v) verbose=true
             shifts=false
             ;;
         -*) error "No such option: $1"
@@ -102,8 +102,9 @@ set -- "${POSITIONAL_ARGS[@]}"
 #~#~################################################################################################################~#~#
 
 if [ -z "$1" ]; then
-    error "Need target."
+    error "Need target wad."
 fi
+targetWad="$1"
 
 testDir=""
 wadType="pwad"
@@ -112,7 +113,7 @@ if [ -n "$tester" ]; then
     wadType="twad"
 fi
 
-dirSuffix="$testDir${1,,}"
+dirSuffix="$testDir${targetWad,,}"
 wadDir="$wadType/$dirSuffix"
 if [ ! -d "$wadDir" ]; then
     error "Could not find WAD dir: $wadDir"
@@ -124,9 +125,10 @@ fi
 
 files=()
 for file in "$wadDir"/*; do
-    if [ -f "$file" ] && \
-       [ "$(isExtension "$file" ".bat" ".rar" ".txt" ".zip")" = false ]; then
-        files+=("$file")
+    fullPath="$(readlink -f "$file")"
+
+    if [ "$(isExtension $fullPath ".bat" ".rar" ".txt" ".zip")" = false ]; then
+        files+=("$fullPath")
     fi
 done
 
@@ -135,7 +137,7 @@ done
 #   Also, any PWAD-specific considerations should be added here.
 #~#~################################################################################################################~#~#
 
-case "$target" in
+case "$1" in
     "plutonia2")
         iwad="PLUTONIA"
         ;;
@@ -165,7 +167,7 @@ for file in "${modFiles[@]}"; do
 
     modFile="$GZDOOM_MOD_DIR/$file"
     if [ -f "$modFile" ]; then
-        files+=("$file")
+        files+=("$modFile")
     else
         warning "$modFile not found."
     fi
@@ -188,8 +190,9 @@ case "$skill" in
 esac
 
 demoDir="$DOOM_DEMO_DIR/$GZDOOM_LATEST_VERSION/$dirSuffix/map$map"
-demoName="$DOOM_PLAYER-$target-$map-$difficulty-${category}"
+demoName="$DOOM_PLAYER-$1-$map-$difficulty-${category}"
 
+mkdir -p "$demoDir"
 if [ -n "$demo" ]; then
     demoCommand="-playdemo"
     demoNumber="$demo"
@@ -197,9 +200,8 @@ else
     demoCommand="-record"
     demoNumber="$(find "$demoDir" -maxdepth 2 -type f -name "*.lmp" | wc -l)"
 
-    mkdir -p "$demoDir"
 fi
-demoFile="${demoName}_$demoNumber"
+demoFile="$demoDir/${demoName}_$demoNumber.lmp"
 
 if [ -n "$demo" ]; then
     if [ ! -f "$demoFile" ]; then
@@ -214,8 +216,8 @@ if [ "$verbose" = true ]; then
 fi
 
 "$GZDOOM_DIR/gzdoom.exe" -file "${files[@]}" \
-                         -iwad "$iwad.wad" \
+                         -iwad "$DOOM_IWAD_DIR/$iwad.wad" \
                          -complevel "$complevel" \
-                         -skill "$difficulty" \
+                         -skill "$skill" \
                          -warp "$map" \
                          "$demoCommand" "${demoFile[*]}" &
