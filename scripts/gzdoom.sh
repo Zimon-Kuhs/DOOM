@@ -23,48 +23,49 @@ check () {
     fi
 }
 
+category="max"
 demo=""
 difficulty="4"
 files=""
 iwad="doom2"
 map="01"
-mapper=""
 pistolStart="$GZDOOM_DIR/pistolstart.pk3"
 smoothDoom="$GZDOOM_DIR/SmoothDoom.pk3"
 target=""
 
 POSITIONAL_ARGS=()
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -d) check "-d" "$2"
-            demo="$2"
-            shift
-            shift
+    opt="$1"
+    param="$2"
+    shifts=true
+
+    case "$opt" in
+        -c) check "-c" "$param"
+            category="$param"
             ;;
-        -m) check "-m" "$2"
-            map="$2"
-            shift
-            shift
+        -d) check "-d" "$param"
+            demo="$param"
             ;;
-        -s) check "-s" "$2"
-            difficulty="$2"
-            shift
-            shift
+        -m) check "-m" "$param"
+            map="$param"
             ;;
-        -t) check "-t" "$2"
-            mapper="$2"
-            testFolder="_test/$mapper/"
-            shift
-            shift
+        -s) check "-s" "$param"
+            difficulty="$param"
+            ;;
+        -t) check "-t" "$param"
+            testFolder="_test/$param/"
             ;;
         -*) error "No such option: $1"
             ;;
-        *)  POSITIONAL_ARGS+=("$1")
-            shift
-            ;;
+        *)  POSITIONAL_ARGS+=("$opt")
+            shifts=false;;
     esac
+
+    shift
+    if [ "$shifts" = true ]; then
+        shift
+    fi
 done
-echo "$@"
 set -- "${POSITIONAL_ARGS[@]}"
 
 if [ -z "$1" ]; then
@@ -104,7 +105,16 @@ case "$target" in
         smoothDoom=""
         ;;
 esac
-echo "file $smoothDoom $pistolStart"
+
+complevel=2
+case "$iwad" in
+    "TNT")  complevel=4
+            ;;
+    "Plutonia")
+            complevel=4
+            ;;
+esac
+
 for file in $smoothDoom $pistolStart; do
     if [ -n "$file" ]; then
         files+=("$file")
@@ -116,11 +126,11 @@ if [ "${#map}" = 1 ]; then
 fi
 
 outputDir="$GZDOOM_DIR/demo/$targetFolder/map$map"
-demoPath="$outputDir/$DOOM_PLAYER-$target-$map-skill${difficulty}"
+demoPath="$outputDir/$DOOM_PLAYER-$target-$map-skill${difficulty}-${category}"
 
 if [ -n "$demo" ]; then
     demoCommand="-playdemo"
-    demoFile="-playdemo ${demoPath}_$demo.lmp"
+    demoFile="${demoPath}_$demo.lmp"
 else
     mkdir -p "$outputDir"
     demoCommand="-record"
@@ -130,6 +140,7 @@ fi
 set -x
 "$GZDOOM_DIR/gzdoom.exe" -file ${files[*]} \
                          -iwad "$iwad.wad" \
+                         -complevel "$complevel" \
                          -skill "$difficulty" \
                          -warp "$map" \
                          "$demoCommand" "${demoFile[*]}" &
