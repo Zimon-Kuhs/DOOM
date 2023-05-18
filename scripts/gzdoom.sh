@@ -32,6 +32,7 @@ map="01"
 pistolStart="$GZDOOM_DIR/pistolstart.pk3"
 smoothDoom="$GZDOOM_DIR/SmoothDoom.pk3"
 target=""
+verbose=false
 
 POSITIONAL_ARGS=()
 while [[ $# -gt 0 ]]; do
@@ -54,6 +55,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         -t) check "-t" "$param"
             testFolder="_test/$param/"
+            ;;
+        v)  verbose=true
             ;;
         -*) error "No such option: $1"
             ;;
@@ -137,7 +140,10 @@ else
     demoFile="${demoPath}_$(find "$outputDir" -maxdepth 1 -type f | wc -l).lmp"
 fi
 
-set -x
+if [ "$verbose" = true ]; then
+    set -x
+fi
+
 "$GZDOOM_DIR/gzdoom.exe" -file ${files[*]} \
                          -iwad "$iwad.wad" \
                          -complevel "$complevel" \
