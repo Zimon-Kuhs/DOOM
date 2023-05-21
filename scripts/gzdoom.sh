@@ -49,8 +49,9 @@ warning () {
 
 category="max"
 demo=""
+demoVersion="$GZDOOM_LATEST_VERSION"
 files=""
-iwad="DOOM2"
+iwad="doom2"
 map="01"
 skill="4"
 tester=""
@@ -73,6 +74,8 @@ while [[ $# -gt 0 ]]; do
         -c) category="$(check "$opt" "$param")"
             ;;
         -d) demo="$(check "$opt" "$param")"
+            ;;
+        -a) demoVersion="$(check "$opt" "$param")"
             ;;
         -m) map="$(check "$opt" "$param")"
             ;;
@@ -109,12 +112,12 @@ targetWad="$1"
 testDir=""
 wadType="pwad"
 if [ -n "$tester" ]; then
-    testDir="$tester/"
+    testDir="$tester"
     wadType="twad"
 fi
 
-dirSuffix="$testDir${targetWad,,}"
-wadDir="$wadType/$dirSuffix"
+dirSuffix="$testDir/$targetWad"
+wadDir="$DOOM_DIR/$wadType/$dirSuffix"
 if [ ! -d "$wadDir" ]; then
     error "Could not find WAD dir: $wadDir"
 fi
@@ -139,10 +142,10 @@ done
 
 case "$1" in
     "plutonia2")
-        iwad="PLUTONIA"
+        iwad="plutonia"
         ;;
     "tntr")
-        iwad="TNT"
+        iwad="tnt"
         ;;
     "valiant")
         modFiles=()
@@ -189,7 +192,7 @@ case "$skill" in
     5)  difficulty="nm"     ;;
 esac
 
-demoDir="$DOOM_DEMO_DIR/$GZDOOM_LATEST_VERSION/$dirSuffix/map$map"
+demoDir="$DOOM_DEMO_DIR/$demoVersion/$dirSuffix/map$map"
 demoName="$DOOM_PLAYER-$1-$map-$difficulty-${category}"
 
 mkdir -p "$demoDir"
