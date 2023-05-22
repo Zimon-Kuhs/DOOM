@@ -1,46 +1,11 @@
 #!/bin/bash
 
+here="$(readlink -f "$(dirname "$0")")"
+name="$(basename "$(readlink -f "${0%.*}")")"
+. "$here/common.sh"
+
 say () {
-    echo "[$(basename "$(dirname "${0%.*}"))]$1")"
-}
-
-error () {
-    if [ -n "$1" ]; then
-        echo "$1"
-    fi
-
-    code=1
-    if [ -n "$2" ]; then
-        code="$2"
-    fi
-
-    exit "$code"
-}
-
-check () {
-    if [ -z "$1" ]; then
-        error "Nothing to check."
-    fi
-
-    if [ -z "$2" ]; then
-        error "$1 expects an argument."
-    fi
-    echo "$2"
-}
-
-isExtension() {
-    file="$(basename "$1")"
-
-    for extension in ${*:2}; do
-        if [[ $file == *$extension ]]; then
-            echo true
-        fi
-    done
-    echo false
-}
-
-warning () {
-    say "[WARNING]: $1"
+    log "$name" "$1"
 }
 
 #~#~################################################################################################################~#~#
@@ -106,6 +71,7 @@ set -- "${POSITIONAL_ARGS[@]}"
 
 if [ -z "$1" ]; then
     error "Need target wad."
+    exit 1
 fi
 targetWad="$1"
 
@@ -120,6 +86,7 @@ dirSuffix="$testDir/$targetWad"
 wadDir="$DOOM_DIR/$wadType/$dirSuffix"
 if [ ! -d "$wadDir" ]; then
     error "Could not find WAD dir: $wadDir"
+    exit 2
 fi
 
 #~#~################################################################################################################~#~#
@@ -209,9 +176,11 @@ demoFile="$demoDir/${demoName}_$demoNumber.lmp"
 if [ -n "$demo" ]; then
     if [ ! -f "$demoFile" ]; then
         error "No such demo file exists: $demoFile"
+        exit 3
     fi
 elif [ -f "$demoFile" ]; then
     error "Critical error, $demoFile already exists somehow."
+    exit 4
 fi
 
 if [ "$verbose" = true ]; then
