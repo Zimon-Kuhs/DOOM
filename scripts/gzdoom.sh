@@ -15,6 +15,8 @@ episodicMap () {
     case "$length" in
         2)  number="e${1:0:1}m${1:1:1}"
             ;;
+        3)  number="e$1"
+            ;;
         4)  ;;
         *)  error "Invalid map string $1."
             exit 6
@@ -67,12 +69,13 @@ files=""
 iwad="doom2"
 map="01"
 noLaunch=false
+noModFiles=false
 skill="4"
 tester=""
 verbose=false
 
 modFiles=()
-modFiles+=("SmoothDoom.pk3")
+modFiles+=("smoothdoom.pk3")
 
 #~#~################################################################################################################~#~#
 #   Git Bash friendly getopt.
@@ -101,6 +104,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         -x) noLaunch=true
             ;;
+        -u) noModFiles=true
+            ;;
         -v) verbose=true
             shifts=false
             ;;
@@ -118,20 +123,32 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${POSITIONAL_ARGS[@]}"
 
-#~#~################################################################################################################~#~#
-#   Fix/align args.
-#~#~################################################################################################################~#~#
-map=${map: -2} || error "Invalid map number."
-
-#~#~################################################################################################################~#~#
-#   Figure out the WAD dir and check if it exists.
-#~#~################################################################################################################~#~#
-
 if [ -z "$1" ]; then
     error "Need target wad."
     exit 1
 fi
+
+#~#~################################################################################################################~#~#
+#   Fix/align args.
+#~#~################################################################################################################~#~#
+
+case "${#map}" in
+    0)  error "Invalid map string."
+        exit 8
+        ;;
+    1)  map="0$map"
+        ;;
+    2)  ;;
+    *)  map="${map:-2}"
+        ;;
+esac
+
 targetWad="$(lowerCase "$1")"
+tester="$(lowerCase "$tester")"
+
+#~#~################################################################################################################~#~#
+#   Figure out the WAD dir and check if it exists.
+#~#~################################################################################################################~#~#
 
 testDir=""
 wadType="pwad"
@@ -153,17 +170,23 @@ fi
 #~#~################################################################################################################~#~#
 
 case "$1" in
+    "cchest")
+        modFiles+=("midtwid2.wad")
+        ;;
     "doom")
         map="$(episodicMap "$map")" || exit 6
+        modFiles+=("ultmidi.wad")
         ;;
     "plutonia")
+        modFiles+=("plutmidi.wad")
+        modFiles+=("plutmidi-np.wad")
         ;;
     "plutonia2")
         iwad="plutonia"
         ;;
     "tnt")
-        modFiles+=("TNTmidi.wad")
-        modFiles+=("TNTmidi-np.wad")
+        modFiles+=("tntmidi.wad")
+        modFiles+=("tntmidi-np.wad")
         ;;
     "tntr")
         iwad="tnt"
@@ -172,10 +195,15 @@ case "$1" in
         modFiles=()
         ;;
 esac
-iwadFile="$DOOM_IWAD_DIR/$iwad/$iwad.wad"
+
+if [ "$noModFiles" = true ]; then
+    modFiles=()
+fi
 
 dirSuffix="$testDir$targetWad"
+iwadFile="$DOOM_IWAD_DIR/$iwad/$iwad.wad"
 wadDir="$DOOM_DIR/$wadType/$dirSuffix"
+
 if [ ! -d "$wadDir" ]; then
     error "Could not find WAD dir: $wadDir"
     exit 2
@@ -211,7 +239,7 @@ for file in "${modFiles[@]}"; do
     if [ -f "$modFile" ]; then
         files+=("$modFile")
     else
-        warning "$modFile not found."
+        warning "Mod $modFile not found."
     fi
 done
 
@@ -228,6 +256,7 @@ case "$skill" in
     1)  difficulty="itytd"  ;;
     2)  difficulty="hntr"   ;;
     3)  difficulty="hmp"    ;;
+    4)  difficulty="uv"     ;;
     5)  difficulty="nm"     ;;
 esac
 
@@ -241,8 +270,8 @@ if [ -n "$demo" ]; then
 else
     demoCommand="-record"
     demoNumber="$(find "$demoDir" -maxdepth 2 -type f -name "*.lmp" | wc -l)"
-
 fi
+
 demoFile="$demoDir/${demoName}_$demoNumber.lmp"
 
 if [ -n "$demo" ]; then
