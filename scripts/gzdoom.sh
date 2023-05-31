@@ -1,8 +1,32 @@
 #!/bin/bash
+#
+# shellcheck disable=SC2806
 
 here="$(readlink -f "$(dirname "$0")")"
 name="$(basename "$(readlink -f "${0%.*}")")"
 . "$here/common.sh"
+
+demoMapString() {
+    if [ -z "$1" ]; then
+        exit 6
+    fi
+
+    mapIwad="doom2"
+    if [ -z "$2" ]; then
+        warning "No IWAD parameter to demoMapString, defaulting doom2."
+    else
+        mapIwad="$2"
+    fi
+
+    result=""
+    if [ "$mapIwad" = "doom" ]; then
+        result="e${1:0:1}m${1:1:1}"
+    else
+        result="map$1"
+    fi
+
+    echo "$result"
+}
 
 episodicMap () {
     if [ -z "$1" ]; then
@@ -67,7 +91,7 @@ demo=""
 demoVersion="$GZDOOM_LATEST_VERSION"
 files=""
 iwad="doom2"
-map="01"
+map=""
 noLaunch=false
 noModFiles=false
 skill="4"
@@ -96,7 +120,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -l) compatmode="$(checkArg "$opt" "$param")"
             ;;
-        -m) map="$(checkArg "$opt" "$param")"
+        -m) if [ "${3:0:1}" != "-" ]; then
+                param="$2 $3"
+            fi
+            map="$(checkArg "$opt" "$param")"
             ;;
         -s) difficulty="$(checkArg "$opt" "$param")"
             ;;
@@ -133,9 +160,7 @@ fi
 #~#~################################################################################################################~#~#
 
 case "${#map}" in
-    0)  error "Invalid map string."
-        exit 8
-        ;;
+    0)  ;;
     1)  map="0$map"
         ;;
     2)  ;;
@@ -165,6 +190,14 @@ else
     done
 fi
 
+if [ -z "$map" ]; then
+    if [ "$iwad" = "doom" ]; then
+        map="1 1"
+    else
+        map="01"
+    fi
+fi
+
 #~#~################################################################################################################~#~#
 #   Any PWAD-specific considerations should be added here.
 #~#~################################################################################################################~#~#
@@ -174,8 +207,10 @@ case "$1" in
         modFiles+=("midtwid2.wad")
         ;;
     "doom")
-        map="$(episodicMap "$map")" || exit 6
-        modFiles+=("ultmidi.wad")
+        modFiles+=("ultimidi.wad")
+        ;;
+    "doom2")
+        modFiles+=("midtwid2.wad")
         ;;
     "plutonia")
         modFiles+=("plutmidi.wad")
@@ -183,6 +218,12 @@ case "$1" in
         ;;
     "plutonia2")
         iwad="plutonia"
+        ;;
+    "sstruggle")
+        iwad="doom"
+        ;;
+    "stickney")
+        iwad="doom"
         ;;
     "tnt")
         modFiles+=("tntmidi.wad")
@@ -261,7 +302,7 @@ case "$skill" in
 esac
 
 demoDir="$DOOM_DEMO_DIR/gzdoom/$demoVersion/$dirSuffix/map$map"
-demoName="$DOOM_PLAYER-$1$map-$difficulty-${category}"
+demoName="$DOOM_PLAYER-$1$(demoMapString "$map")-$difficulty-${category}"
 
 mkdir -p "$demoDir"
 if [ -n "$demo" ]; then
@@ -303,5 +344,5 @@ fi
                          -file "${files[@]}" \
                          -iwad "$iwadFile" \
                          -skill "$skill" \
-                         -warp "$map" \
+                         -warp $map \
                          "$demoCommand" "${demoFile[*]}" &
