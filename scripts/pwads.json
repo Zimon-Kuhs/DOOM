@@ -1,0 +1,37 @@
+{
+    "cchest": {
+        "mods": [ "midtwid2.wad" ]
+    },
+    "doom": {
+        "mods": [ "ultimidi.wad" ]
+    },
+    "doom2": {
+        "mods": [ "midtwid2.wad" ]
+    },
+    "plutonia": {
+        "iwad": "plutonia",
+        "mods": [ "plutmidi.wad", "plutmidi-np.wad" ]
+    },
+    "plutonia2": {
+        "iwad": "plutonia",
+        "mods": [ "midtwid2.wad" ]
+    },
+    "sstruggle": {
+        "iwad": "doom",
+        "mods": [ "midtwid2.wad" ]
+    },
+    "stickney": {
+        "iwad": "doom",
+        "mods": [ "midtwid2.wad" ]
+    },
+    "tnt": {
+        "iwad": "tnt",
+        "mods": [ "plutmidi.wad", "plutmidi-np.wad" ]
+    },
+    "tntr": {
+        "iwad": "tnt"
+    },
+    "valiant": {
+        "mods": false
+    }
+}
