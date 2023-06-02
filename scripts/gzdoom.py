@@ -9,8 +9,6 @@ IWADS = [ "doom", "doom2", "tnt", "plutonia" ]
 
 MOD_FILES_IGNORE = [ ".bat", ".md", ".rar", ".gz", ".txt", ".zip" ]
 
-PWADS = None
-
 SPECIAL_MAPPERS = {
     "cinnamon": "zwad",
     "garlic":   "bwad"
@@ -44,20 +42,38 @@ def env(parameter):
     return result
 
 
-def getIWad(targetWad):
+def getDemoFile(executable, version, player, target, map, difficulty, category, demoNumber):
+    directory = os.path.join(env("DOOM_DEMO_DIR"), executable, version, player, target, map)
+    file = "-".join([player, target, map, difficulty, category])
+    path = os.path.join(directory, file)
+
+    doRecord = demoNumber is None or demoNumber == "" or int(demoNumber) < 0
+    fullPath = (f"{path}_{demoNumber}" if doRecord else nextFile(path)) + ".lmp"
+
+    fileExists = os.path.exists(fullPath)
+    if fileExists:
+        if doRecord:
+            raise ValueError(f"File {fullPath} exists; name calculation broke.")
+    elif not doRecord:
+        raise ValueError(f"File {fullPath} doesn't exist.")
+
+    return fullPath
+
+
+def getIWad(configuration, targetWad):
     if targetWad in IWADS:
         return targetWad
 
     iwadKey = "iwad"
-    if targetWad in PWADS and iwadKey in PWADS[targetWad]:
-        return PWADS[targetWad][iwadKey]
+    if targetWad in configuration and iwadKey in configuration[targetWad]:
+        return configuration[targetWad][iwadKey]
 
     return "doom2"
 
 
 def getPWad(target, iwad, mapper):
     targetDir = "pwad"
-    if target == iwad:
+    if target in IWADS:
         targetDir = "iwad"
     elif mapper:
         lowerMapper = mapper.lower()
@@ -66,6 +82,16 @@ def getPWad(target, iwad, mapper):
 
     return verifyFile(os.path.join(f"{env('DOOM_DIR')}", f"{targetDir}", f"{target}", f"{target}.wad"))
 
+
+def nextFile(filePath):
+    number = 0
+    result = f"{filePath}_{stringNumber(number, 3)}"
+
+    while os.path.exists(result):
+        number += 1
+        result = f"{filePath}_{stringNumber(number, 3)}"
+
+    return result
 
 def parseMap(mapList, iwad):
     amount = len(mapList)
@@ -82,15 +108,19 @@ def parseMap(mapList, iwad):
     return "map" + ("0" if numbers[0] < 10 else "") + str(numbers[0]), numbers
 
 
-def readMods(sourceDir, targetWad):
-    global PWADS
+def readJson(filePath):
+    with open(filePath) as contents:
+        return json.load(contents)
+
+
+def readMods(configuration, sourceDir, targetWad):
     modKey = "mods"
 
-    if targetWad not in PWADS or modKey not in PWADS[targetWad]:
+    if targetWad not in configuration or modKey not in configuration[targetWad]:
         return []
 
     result = []
-    for file in PWADS[targetWad][modKey]:
+    for file in configuration[targetWad][modKey]:
         fullPath = os.path.join(sourceDir, file)
         print(fullPath)
 
@@ -98,6 +128,13 @@ def readMods(sourceDir, targetWad):
             continue
         result.append(fullPath)
 
+    return result
+
+
+def stringNumber(number, amount):
+    result = str(number)
+    while len(result) < amount:
+        result = f"0{result}"
     return result
 
 
@@ -118,33 +155,38 @@ def verifyFile(filePath):
 
 
 class Launch:
-    _addon         = []
-    _category      = ""
-    _command       = ""
-    _compatibility = ""
-    _demo          = ""
-    _difficulty    = SKILLS["uv"]
-    _doLaunch      = True
-    _executable    = env("GZDOOM_EXE")
-    _files         = []
-    _iwad          = "doom2"
-    _map           = ""
-    _mapper        = ""
-    _modDir        = ""
-    _mods          = ""
-    _player        = env("DOOM_PLAYER")
-    _skill         = ""
-    _target        = ""
-    _targetPath    = ""
-    _warp          = ""
-    _useMods       = True
-    _verbose       = False
-    _version       = env("GZDOOM_LATEST_VERSION")
+    _addon             = []
+    _category          = ""
+    _command           = ""
+    _compatibility     = ""
+    _configuration     = {}
+    _configurationPath = ""
+    _demo              = ""
+    _demoPath          = ""
+    _difficulty        = SKILLS["uv"]
+    _doLaunch          = True
+    _executable        = env("GZDOOM_EXE")
+    _files             = []
+    _iwad              = "doom2"
+    _iwadPath          = ""
+    _map               = ""
+    _mapper            = ""
+    _modDir            = ""
+    _mods              = ""
+    _player            = env("DOOM_PLAYER")
+    _skill             = ""
+    _target            = ""
+    _targetPath        = ""
+    _warp              = ""
+    _useMods           = True
+    _verbose           = False
+    _version           = env("GZDOOM_LATEST_VERSION")
 
     def __init__(self,
                  category,
                  compatibility,
                  demo,
+                 configuration,
                  doLaunch,
                  executable,
                  files,
@@ -157,37 +199,48 @@ class Launch:
                  verbose,
                  version):
 
-        iwad = getIWad(target)
+        addonPath         = os.path.join(os.path.dirname(self._executable), "addon")
+        executablePath    = str(executable)
+        modPath           = os.path.join(os.path.dirname(self._executable), "mod")
+        skill, difficulty = SKILLS[str(skill)]
+        targetPath        = getPWad(target, self._iwad, mapper)
 
-        addonPath      = os.path.join(os.path.dirname(self._executable), "addon")
-        executablePath = str(executable)
-        iwadPath       = os.path.join(env("DOOM_IWAD_DIR"), iwad, f"{iwad}.wad")
-        modPath        = os.path.join(os.path.dirname(self._executable), "mod")
-        targetPath     = getPWad(target, self._iwad, mapper)
+        self._addon             = verifyDir(addonPath)
+        self._configurationPath = verifyFile(configuration)
+        self._executablePath    = verifyFile(executablePath)
+        self._modDir            = verifyDir(modPath)
+        self._targetPath        = verifyFile(targetPath)
 
-        self._addon      = verifyDir(addonPath)
-        self._iwad       = verifyFile(iwadPath)
-        self._executable = verifyFile(executablePath)
-        self._modDir     = verifyDir(modPath)
-        self._targetPath = verifyFile(targetPath)
-
-        self._category                = str(category)
-        self._compatibility           = str(compatibility)
+        self._category                = str(category).lower()
+        self._compatibility           = str(compatibility).lower()
+        self._difficulty              = str(difficulty).lower()
+        self._demo                    = str(demo)
         self._doLaunch                = bool(doLaunch)
         self._files                   = list(files)
-        self._mapper                  = str(mapper)
-        self._player                  = str(player)
-        self._target                  = str(target)
-        self._version                 = str(version)
+        self._mapper                  = str(mapper).title()
+        self._player                  = str(player).title()
+        self._skill                   = str(skill).lower()
+        self._target                  = str(target).lower()
+        self._version                 = str(version).lower()
         self._useMods                 = bool(useMods)
         self._verbose                 = bool(verbose)
 
-        self._command = "-record" if not self._demo else "-playdemo"
-        self._demo                    = 0 if not demo else int(demo)
-        self._skill, self._difficulty = SKILLS[str(skill)]
-
+        self._command                 = "-record" if not self._demo else "-playdemo"
+        self._configuration           = readJson(self._configurationPath)
+        self._executable              = os.path.basename(self._executablePath).split(".")[0]
+        self._iwad                    = getIWad(self._configuration, target)
+        self._iwadPath                = verifyFile(os.path.join(env("DOOM_IWAD_DIR"), self._iwad, f"{self._iwad}.wad"))
         self._map, self._warp         = parseMap(map, self._iwad)
-        self._mods                    = readMods(self._modDir, self._target) + autoLoad(self._addon)
+        self._mods                    = readMods(configuration, self._modDir, self._target) + autoLoad(self._addon)
+
+        self._demoPath                = getDemoFile(self._executable,
+                                                    self._version,
+                                                    self._player,
+                                                    self._target,
+                                                    self._map,
+                                                    self._difficulty,
+                                                    self._category,
+                                                    self._demo)
 
 
     def execute(self):
@@ -195,17 +248,45 @@ class Launch:
             print(self)
 
         result = []
-        result.append(self.executable())
+        result.append(self.executablePath())
         result.extend(["-compatmode", self.compatibility()])
-        result.extend(["-iwad", self.iwad()])
+        result.extend(["-iwad", self.iwadPath()])
         result.extend(["-file"] + self.files())
-        result.extend(["-warp"] + [str(part) for part in self.warp()])
+        result.extend(["-skill", self.skill()])
+        result.extend(["-warp"] + self.warp())
         result.extend([self.demoCommand(), self.demoPath()])
 
-        return result
+        if self._doLaunch:
+            return subprocess.call(result)
+        else:
+            print(" ".join(result))
+
+    def __str__(self):
+        commandString = self.demoCommand()
+        commandString = commandString + ("" if len(commandString) == 9 else "  ")
+
+        lines = ["Launch commands:"]
+        lines.append(f"    executable: {self.executablePath()}")
+        lines.append(f"        -compatmode: {self.compatibility()}")
+        lines.append(f"        -file:       {self.files()}")
+        lines.append(f"        -iwad:       {self.iwadPath()}")
+        lines.append(f"        -skill:      {self.skill()}")
+        lines.append(f"        -warp:       {self.warp()}")
+        lines.append(f"        {self.demoCommand()}      {self.demoPath()}")
+
+        return "\n".join(lines)
+
+    def demoCommand(self):
+        return self._command
+
+    def demoPath(self):
+        return self._demoPath
 
     def executable(self):
         return self._executable
+
+    def executablePath(self):
+        return self._executablePath
 
     def compatibility(self):
         return self._compatibility
@@ -219,6 +300,9 @@ class Launch:
     def iwad(self):
         return self._iwad
 
+    def iwadPath(self):
+        return self._iwadPath
+
     def target(self):
         return self._target
 
@@ -228,43 +312,6 @@ class Launch:
     def warp(self):
         return [str(number) for number in self._warp]
 
-    def demoCommand(self):
-        return self._command
-
-    def demoFile(self):
-        return "-".join([
-            self._player,
-            self._target,
-            self._map,
-            self._difficulty,
-            self._category,
-        ]) + ".lmp"
-
-    def demoDir(self):
-        return os.path.join(env("DOOM_DEMO_DIR"),
-                            self._player.lower(),
-                            "gzdoom",
-                            self._version,
-                            self._target,
-                            self._map)
-
-    def demoPath(self):
-        return os.path.join(self.demoDir(), self.demoFile())
-
-
-    def __str__(self):
-        commandString = self.demoCommand()
-        commandString = commandString + ("" if len(commandString) == 9 else "  ")
-
-        lines = ["Launch commands:"]
-        lines.append(f"    executable: {self.executable()}")
-        lines.append(f"        -compatmode: {self.compatibility()}")
-        lines.append(f"        -file:       {self.files()}")
-        lines.append(f"        -iwad:       {self.iwad()}")
-        lines.append(f"        -skill:      {self.skill()}")
-        lines.append(f"        -warp:       {self.warp()}")
-        lines.append(f"        {self.demoCommand()}      {self.demoPath()}")
-        return "\n".join(lines)
 
 def readLaunch(argv):
     parser = argparse.ArgumentParser(prog = "DOOM Launcher", description = "DOOM Launcher Helper")
@@ -311,20 +358,20 @@ def readLaunch(argv):
 
     parser.add_argument("-v", "--verbose",          action  = "store_const",
                                                     const   = True,
+                                                    default = False,
                                                     help    = "Print list of doom parameters.")
 
-    parser.add_argument("-x", "--noLaunch",         default = "False",
+    parser.add_argument("-x", "--noLaunch",         action  = "store_const",
+                                                    const   = True,
+                                                    default = False,
                                                     help    = "Don't run the command.")
 
     result = parser.parse_args(argv)
 
-    with open(result.configuration) as contents:
-        global PWADS
-        PWADS = json.load(contents)
-
     return Launch(
         category      = result.category,
         compatibility = result.compatibility,
+        configuration = result.configuration,
         demo          = result.demo,
         doLaunch      = not result.noLaunch,
         executable    = result.executable,
@@ -341,6 +388,4 @@ def readLaunch(argv):
 
 
 if __name__ == "__main__":
-    command = readLaunch(sys.argv[1:]).execute()
-    print(command)
-    subprocess.call(command)
+    sys.exit(readLaunch(sys.argv[1:]).execute())

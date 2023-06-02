@@ -26,7 +26,7 @@
     },
     "tnt": {
         "iwad": "tnt",
-        "mods": [ "plutmidi.wad", "plutmidi-np.wad" ]
+        "mods": [ "tntmidi.wad", "tntmidi-np.wad" ]
     },
     "tntr": {
         "iwad": "tnt"
