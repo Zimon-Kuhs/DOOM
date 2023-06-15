@@ -1,4 +1,7 @@
 {
+    "auqpn": {
+        "iwad": "doom"
+    },
     "cchest": {
         "mods": [ "midtwid2.wad" ]
     },
@@ -7,6 +10,9 @@
     },
     "doom2": {
         "mods": [ "midtwid2.wad" ]
+    },
+    "masterlevels": {
+        "mods": [ "ml_midipack_crispydoom.wad" ]
     },
     "plutonia": {
         "iwad": "plutonia",

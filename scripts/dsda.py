@@ -220,7 +220,7 @@ class Launch:
     _demoPath          = ""
     _difficulty        = SKILLS["uv"]
     _doLaunch          = True
-    _executable        = env("GZDOOM_EXE")
+    _executable        = env("DSDA_EXE")
     _fast              = False
     _files             = []
     _iwad              = "doom2"
@@ -239,7 +239,7 @@ class Launch:
     _warp              = ""
     _useMods           = True
     _verbose           = False
-    _version           = env("GZDOOM_LATEST_VERSION")
+    _version           = env("DSDA_LATEST_VERSION")
 
     def __init__(self,
                  category,
@@ -323,7 +323,7 @@ class Launch:
 
         lines = ["Launch commands:"]
         lines.append(f"    executable: {self.executablePath()}")
-        lines.append(f"        -compatmode: {self.compatibility()}")
+        lines.append(f"        -complevel:  {self.compatibility()}")
 
         lines.append(f"        -file:       {self.files()}")
         lines.append(f"        -iwad:       {self.iwadPath()}")
@@ -359,7 +359,7 @@ class Launch:
 
         result = []
         result.append(self.executablePath())
-        result.extend(["-compatmode", self.compatibility()])
+        result.extend(["-complevel", self.compatibility()])
         result.extend(["-iwad", self.iwadPath()])
         result.extend(["-file"] + self.files())
         result.extend(["-skill", self.skill()])
@@ -422,7 +422,7 @@ def readLaunch(argv):
     parser.add_argument("-d", "--demo",             default = "",
                                                     help    = "Run demo; argument is demo number.")
 
-    parser.add_argument("-e", "--executable",       default = env("GZDOOM_EXE"),
+    parser.add_argument("-e", "--executable",       default = env("DSDA_EXE"),
                                                     help    = "Executable to use.")
 
     parser.add_argument("-f", "--files",            default = [],
@@ -442,13 +442,13 @@ def readLaunch(argv):
                                                     help    = "Play without monsters.")
 
     parser.add_argument("-o", "--compatibility",    default = "2",
-                                                    help    = "Compatibility setting (compatmode).")
+                                                    help    = "Compatibility setting (complevel).")
 
     parser.add_argument("-p", "--player",           help    = "Player name.",
                                                     default = env("DOOM_PLAYER"))
 
-    parser.add_argument("-r", "--version",          default = env("GZDOOM_LATEST_VERSION"),
-                                                    help    = "GZDoom version.")
+    parser.add_argument("-r", "--version",          default = env("DSDA_LATEST_VERISON"),
+                                                    help    = "DSDA version.")
 
     parser.add_argument("-s", "--skill",            help    = "Difficulty.",
                                                     default = "4")
