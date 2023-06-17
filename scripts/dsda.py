@@ -24,10 +24,19 @@ SETTING_COMPATIBILITY = [
     { "-nomo" }
 ]
 
-SETTING_KEY = {
-    "fast":    "f",
-    "nomo":    "o",
-    "respawn": "r"
+CATEGORY_KEY = {
+    "collector":    "col",
+    "fast":         "f",
+    "max":          "m",
+    "nomo":         "o",
+    "nomo100":      "os",
+    "speed":        "",
+    "nightmare":    "n",
+    "nightmare100": "s",
+    "pacifist":     "p",
+    "respawn":      "r",
+    "stroller":     "str",
+    "tyson":        "t",
 }
 
 SKILLS = {
@@ -51,24 +60,25 @@ def autoLoad(modDir):
     return result
 
 
-def demoFileSetup(executable, version, player, mapper, target, map, difficulty, category, settings, demo):
+def demoFileSetup(executable, version, player, mapper, target, short, mapData, difficulty, category, settings, demo):
     dirBase  = os.path.join(env("DOOM_DEMO_DIR"), executable, version, player)
 
     if mapper is not None and mapper != "":
         dirBase = os.path.join(dirBase, ".test", mapper)
 
-    demoDir  = os.path.join(dirBase, target, map)
-    demoFile = "-".join([player, target, map, difficulty])
+    demoDir  = os.path.join(dirBase, target, mapData)
 
-    extraPart = ""
-    for flag, setting in settings.items():
-        if setting:
-            extraPart = f"{extraPart}{SETTING_KEY[flag]}"
+    mapPart      = mapData[2:] if len(mapData) == 1 else mapData
+    skillPart    = "" if difficulty == "uv" else SKILLS[difficulty][1][:2]
+    wadPart      = (short if short else target)
+    wadPart      = wadPart if wadPart not in [ "doom", "doom2" ] else ""
+    categoryPart = CATEGORY_KEY[category] + "".join([CATEGORY_KEY[setting] for setting, value in settings.items() if value])
 
-    result = ""
-    fullPath = f"{os.path.join(demoDir, demoFile)}{extraPart}-{category}"
+    demoFile = "".join([ wadPart, mapPart, skillPart, categoryPart ])
+
+    fullPath = f"{os.path.join(demoDir, demoFile)}-HHMMSS.lmp"
+    result = fullPath
     if demo is None or demo == "":
-        result = nextFile(fullPath, ".lmp")
 
         if os.path.exists(result):
             raise ValueError(f"File for -record already exists. {result}")
@@ -83,7 +93,6 @@ def demoFileSetup(executable, version, player, mapper, target, map, difficulty, 
 
         if not os.path.exists(result):
             raise ValueError(f"File for -playdemo doesn't exist. {result}")
-
 
     return f"{result}"
 
@@ -229,11 +238,13 @@ class Launch:
     _mapper            = ""
     _modDir            = ""
     _mods              = ""
+    _modifiers         = {}
     _noMonsters        = False
     _player            = env("DOOM_PLAYER")
     _respawn           = False
     _settings          = {}
     _skill             = ""
+    _short             = ""
     _target            = ""
     _targetPath        = ""
     _warp              = ""
@@ -290,9 +301,9 @@ class Launch:
         self._useMods       = bool(useMods)
         self._verbose       = bool(verbose)
 
-        self._settings[ARG_TO_SETTING["--fast"]]          = self._fast
-        self._settings[ARG_TO_SETTING["--nomonsters"]]    = self._noMonsters
-        self._settings[ARG_TO_SETTING["--respawn"]]       = self._respawn
+        self._modifiers[ARG_TO_SETTING["--fast"]]          = self._fast
+        self._modifiers[ARG_TO_SETTING["--nomonsters"]]    = self._noMonsters
+        self._modifiers[ARG_TO_SETTING["--respawn"]]       = self._respawn
 
         self._command         = "-record" if not self._demo else "-playdemo"
         self._configuration   = readJson(self._configurationPath)
@@ -301,6 +312,7 @@ class Launch:
         self._iwadPath        = verifyFile(os.path.join(env("DOOM_IWAD_DIR"), self._iwad, f"{self._iwad}.wad"))
         self._map, self._warp = parseMap(map, self._iwad)
         self._mods            = readMods(self._configuration, self._modDir, self._target) + autoLoad(self._addon)
+        self._short           = self._configuration["short"] if "short" in self._configuration else ""
 
         self._files += self._mods
         if self._iwad != self._target:
@@ -311,10 +323,11 @@ class Launch:
                                        self._player,
                                        self._mapper,
                                        self._target,
+                                       self._short,
                                        self._map,
                                        self._difficulty,
                                        self._category,
-                                       self._settings,
+                                       self._modifiers,
                                        self._demo)
 
     def __str__(self):
@@ -441,13 +454,13 @@ def readLaunch(argv):
                                                     default = False,
                                                     help    = "Play without monsters.")
 
-    parser.add_argument("-o", "--compatibility",    default = "2",
+    parser.add_argument("-o", "--compatibility",    default = None,
                                                     help    = "Compatibility setting (complevel).")
 
     parser.add_argument("-p", "--player",           help    = "Player name.",
                                                     default = env("DOOM_PLAYER"))
 
-    parser.add_argument("-r", "--version",          default = env("DSDA_LATEST_VERISON"),
+    parser.add_argument("-r", "--version",          default = env("DSDA_LATEST_VERSION"),
                                                     help    = "DSDA version.")
 
     parser.add_argument("-s", "--skill",            help    = "Difficulty.",
