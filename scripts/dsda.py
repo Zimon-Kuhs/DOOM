@@ -5,9 +5,13 @@ import subprocess
 import sys
 
 ARG_TO_SETTING = {
-    "--fast":       "fast",
-    "--respawn":    "respawn",
-    "--nomonsters": "nomo"
+    "fast": "fast",
+    "nomo": "nomonsters",
+    "resp": "respawn",
+}
+
+COMPATIBILITIES = {
+    "2", "3", "4", "9", "11", "21"
 }
 
 IWADS = [ "doom", "doom2", "tnt", "plutonia" ]
@@ -60,7 +64,21 @@ def autoLoad(modDir):
     return result
 
 
-def demoFileSetup(executable, version, player, mapper, target, short, mapData, difficulty, category, settings, demo):
+def calculateCompatibility(compatibility, iwad):
+    if compatibility is None:
+        return {
+            "doom":     "3",
+            "doom2":    "2",
+            "plutonia": "4",
+            "tnt":      "4"
+        }[iwad]
+
+    if compatibility not in COMPATIBILITIES:
+        raise ValueError(f"No such complevel: {compatibility}.")
+
+    return compatibility
+
+def demoFileSetup(executable, version, player, mapper, target, short, mapData, difficulty, category, modifiers, demo):
     dirBase  = os.path.join(env("DOOM_DEMO_DIR"), executable, version, player)
 
     if mapper is not None and mapper != "":
@@ -72,7 +90,7 @@ def demoFileSetup(executable, version, player, mapper, target, short, mapData, d
     skillPart    = "" if difficulty == "uv" else SKILLS[difficulty][1][:2]
     wadPart      = (short if short else target)
     wadPart      = wadPart if wadPart not in [ "doom", "doom2" ] else ""
-    categoryPart = CATEGORY_KEY[category] + "".join([CATEGORY_KEY[setting] for setting, value in settings.items() if value])
+    categoryPart = CATEGORY_KEY[category] + "".join([CATEGORY_KEY[modifier] for modifier, value in modifiers.items() if value])
 
     demoFile = "".join([ wadPart, mapPart, skillPart, categoryPart ])
 
@@ -242,7 +260,6 @@ class Launch:
     _noMonsters        = False
     _player            = env("DOOM_PLAYER")
     _respawn           = False
-    _settings          = {}
     _skill             = ""
     _short             = ""
     _target            = ""
@@ -285,7 +302,6 @@ class Launch:
         self._targetPath        = verifyFile(targetPath)
 
         self._category      = str(category).lower()
-        self._compatibility = str(compatibility).lower()
         self._difficulty    = str(difficulty).lower()
         self._demo          = str(demo)
         self._doLaunch      = bool(doLaunch)
@@ -301,9 +317,9 @@ class Launch:
         self._useMods       = bool(useMods)
         self._verbose       = bool(verbose)
 
-        self._modifiers[ARG_TO_SETTING["--fast"]]          = self._fast
-        self._modifiers[ARG_TO_SETTING["--nomonsters"]]    = self._noMonsters
-        self._modifiers[ARG_TO_SETTING["--respawn"]]       = self._respawn
+        self._modifiers["fast"] = self._fast
+        self._modifiers["nomo"] = self._noMonsters
+        self._modifiers["resp"] = self._respawn
 
         self._command         = "-record" if not self._demo else "-playdemo"
         self._configuration   = readJson(self._configurationPath)
@@ -318,17 +334,18 @@ class Launch:
         if self._iwad != self._target:
             self._files.append(self._targetPath)
 
-        self._demoPath = demoFileSetup(self._executable,
-                                       self._version,
-                                       self._player,
-                                       self._mapper,
-                                       self._target,
-                                       self._short,
-                                       self._map,
-                                       self._difficulty,
-                                       self._category,
-                                       self._modifiers,
-                                       self._demo)
+        self._compatibility = calculateCompatibility(compatibility, self._iwad)
+        self._demoPath      = demoFileSetup(self._executable,
+                                            self._version,
+                                            self._player,
+                                            self._mapper,
+                                            self._target,
+                                            self._short,
+                                            self._map,
+                                            self._difficulty,
+                                            self._category,
+                                            self._modifiers,
+                                            self._demo)
 
     def __str__(self):
         commandString = self.demoCommand()
@@ -337,7 +354,6 @@ class Launch:
         lines = ["Launch commands:"]
         lines.append(f"    executable: {self.executablePath()}")
         lines.append(f"        -complevel:  {self.compatibility()}")
-
         lines.append(f"        -file:       {self.files()}")
         lines.append(f"        -iwad:       {self.iwadPath()}")
         lines.append(f"        -skill:      {self.skill()}")
@@ -345,7 +361,7 @@ class Launch:
 
         extraLine = ""
         prefix = ""
-        for flag, setting in self._settings.items():
+        for flag, setting in self._modifiers.items():
             if setting:
                 extraLine = f"{extraLine}{prefix}{flag}"
                 prefix = " "
@@ -356,6 +372,9 @@ class Launch:
         lines.append(f"        {self.demoCommand()}      {self.demoPath()}")
 
         return "\n".join(lines)
+
+    def compatibility(self):
+        return self._compatibility
 
     def demoCommand(self):
         return self._command
@@ -370,19 +389,25 @@ class Launch:
         if self._verbose:
             print(self)
 
+        extraFiles = self.files()
+
         result = []
         result.append(self.executablePath())
         result.extend(["-complevel", self.compatibility()])
         result.extend(["-iwad", self.iwadPath()])
-        result.extend(["-file"] + self.files())
+
+        if len(extraFiles) > 0:
+            result.extend(["-file"] + extraFiles)
+
         result.extend(["-skill", self.skill()])
         result.extend(["-warp"] + self.warp())
 
-        for flag, setting in self._settings.items():
+        for flag, setting in self._modifiers.items():
             if setting:
-                result.extend([flag])
+                result.extend([f"-{ARG_TO_SETTING[flag]}"])
 
         result.extend([self.demoCommand(), self.demoPath()])
+        result.extend(["&"])
 
         if self._doLaunch:
             return subprocess.call(result)

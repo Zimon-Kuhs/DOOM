@@ -1,49 +1,47 @@
 {
     "auqpn": {
-        "iwad":  "doom"
+        "iwad":  "doom",
+        "short": "auq"
     },
     "cchest": {
-        "mods":  [ "midtwid2.wad" ],
-        "short": "cc"
+        "music": [ "midtwid2.wad" ],
+        "short": "cc1"
     },
     "doom": {
-        "mods": [ "ultimidi.wad" ]
+        "music": [ "ultimidi.wad" ]
     },
     "doom2": {
-        "mods": [ "midtwid2.wad" ]
+        "music": [ "midtwid2.wad" ]
     },
     "masterlevels": {
-        "mods":  [ "ml_midipack_crispydoom.wad" ],
+        "music": [ "ml_midipack_crispydoom.wad" ],
         "short": "ml"
     },
     "plutonia": {
         "iwad":  "plutonia",
-        "mods":  [ "plutmidi.wad", "plutmidi-np.wad" ],
+        "music": [ "plutmidi.wad", "plutmidi-np.wad" ],
         "short": "pl"
     },
     "plutonia2": {
-        "iwad": "plutonia",
-        "mods": [ "midtwid2.wad" ]
+        "iwad":  "plutonia",
+        "short": "pl2"
     },
     "sstruggle": {
         "iwad":  "doom",
-        "mods":  [ "midtwid2.wad" ],
-        "short": "sstr"
+        "short": "sost"
     },
     "stickney": {
         "iwad":  "doom",
-        "mods":  [ "midtwid2.wad" ],
-        "short": "stii"
+        "short": "stin"
     },
     "tnt": {
-        "iwad": "tnt",
-        "mods": [ "tntmidi.wad", "tntmidi-np.wad" ]
+        "iwad":  "tnt",
+        "music": [ "tntmidi.wad", "tntmidi-np.wad" ]
     },
     "tntr": {
         "iwad": "tnt"
     },
     "valiant": {
-        "mods":  false,
         "short": "val"
     }
 }
