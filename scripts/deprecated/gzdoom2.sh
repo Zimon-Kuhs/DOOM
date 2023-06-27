@@ -2,9 +2,12 @@
 #
 # shellcheck disable=SC2806
 
+
 here="$(readlink -f "$(dirname "$0")")"
 name="$(basename "$(readlink -f "${0%.*}")")"
-. "$here/common.sh"
+. "$here/../common.sh"
+
+echo "$(readlink -f "$0") Deprecated." && exit 1
 
 demoMapString() {
     if [ -z "$1" ]; then
