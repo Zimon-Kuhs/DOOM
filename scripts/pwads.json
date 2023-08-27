@@ -13,6 +13,12 @@
     "doom2": {
         "music": [ "midtwid2.wad" ]
     },
+    "dtwid": {
+        "iwad": "doom"
+    },
+    "d2twid": {
+        "iwad": "doom2"
+    },
     "masterlevels": {
         "music": [ "ml_midipack_crispydoom.wad" ],
         "short": "ml"

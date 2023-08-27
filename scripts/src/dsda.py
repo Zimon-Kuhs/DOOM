@@ -407,7 +407,6 @@ class Launch:
                 result.extend([f"-{ARG_TO_SETTING[flag]}"])
 
         result.extend([self.demoCommand(), self.demoPath()])
-        result.extend(["&"])
 
         if self._doLaunch:
             return subprocess.call(result)

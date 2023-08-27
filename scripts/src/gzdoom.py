@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import json
 import os
 import subprocess
@@ -65,10 +66,11 @@ def demoFileSetup(executable, version, player, mapper, target, map, difficulty, 
         if setting:
             extraPart = f"{extraPart}{SETTING_KEY[flag]}"
 
+    attempts = -1
     result = ""
     fullPath = f"{os.path.join(demoDir, demoFile)}{extraPart}-{category}"
-    if demo is None or demo == "":
-        result = nextFile(fullPath, ".lmp")
+    if demo is None or demo < 0:
+        result, attempts = nextFile(fullPath, ".lmp")
 
         if os.path.exists(result):
             raise ValueError(f"File for -record already exists. {result}")
@@ -76,16 +78,16 @@ def demoFileSetup(executable, version, player, mapper, target, map, difficulty, 
         os.makedirs(demoDir, exist_ok = True)
 
     else:
-        if not isinstance(demo, str) or not demo.isnumeric():
-            raise ValueError(f"Demo number should be numeric string: {demo} ({type(demo)}).")
+        if not isinstance(demo, int):
+            raise ValueError(f"Demo number should be integer: {demo} ({type(demo)}).")
 
-        result = f"{fullPath}_{stringNumber(demo, 3)}.lmp"
+        result = f"{fullPath}_{stringNumber(str(demo), 3)}.lmp"
 
         if not os.path.exists(result):
             raise ValueError(f"File for -playdemo doesn't exist. {result}")
 
 
-    return f"{result}"
+    return f"{result}", attempts
 
 
 def env(parameter):
@@ -139,7 +141,7 @@ def nextFile(filePath, extension):
         number += 1
         result = f"{filePath}_{stringNumber(number, 3)}{extension}"
 
-    return result
+    return result, number
 
 
 def parseMap(mapList, iwad):
@@ -157,13 +159,19 @@ def parseMap(mapList, iwad):
     return "map" + ("0" if numbers[0] < 10 else "") + str(numbers[0]), numbers
 
 
+def getTime(label="Start: "):
+    current = datetime.datetime.now().replace(microsecond = 0)
+    print(f"{label}{current.strftime('%H:%M:%S')}")
+    return current
+
+
 def readJson(filePath):
     with open(filePath) as contents:
         return json.load(contents)
 
 
 def readMods(configuration, sourceDir, targetWad):
-    modKey = "mods"
+    modKeys = [ "music", "mods" ]
 
     if not configuration:
         raise ValueError("Won't load mods with non-existent configuration.")
@@ -172,16 +180,21 @@ def readMods(configuration, sourceDir, targetWad):
     if not targetWad:
         raise ValueError("Can't read mods for a non-target.")
 
-    if targetWad not in configuration or modKey not in configuration[targetWad]:
+    if targetWad not in configuration:
         return []
 
     result = []
-    for file in configuration[targetWad][modKey]:
-        fullPath = os.path.join(sourceDir, file)
-
-        if not os.path.isfile(fullPath) or os.path.splitext(file) in MOD_FILES_IGNORE:
+    for modKey in modKeys:
+        if modKey not in configuration[targetWad]:
             continue
-        result.append(fullPath)
+
+        result = []
+        for file in configuration[targetWad][modKey]:
+            fullPath = os.path.join(sourceDir, file)
+
+            if not os.path.isfile(fullPath) or os.path.splitext(file) in MOD_FILES_IGNORE:
+                continue
+            result.append(fullPath)
 
     return result
 
@@ -210,36 +223,39 @@ def verifyFile(filePath):
 
 
 class Launch:
-    _addon             = []
-    _category          = ""
-    _command           = ""
-    _compatibility     = ""
-    _configuration     = {}
-    _configurationPath = ""
-    _demo              = ""
-    _demoPath          = ""
-    _difficulty        = SKILLS["uv"]
-    _doLaunch          = True
-    _executable        = env("GZDOOM_EXE")
-    _fast              = False
-    _files             = []
-    _iwad              = "doom2"
-    _iwadPath          = ""
-    _map               = ""
-    _mapper            = ""
-    _modDir            = ""
-    _mods              = ""
-    _noMonsters        = False
-    _player            = env("DOOM_PLAYER")
-    _respawn           = False
-    _settings          = {}
-    _skill             = ""
-    _target            = ""
-    _targetPath        = ""
-    _warp              = ""
-    _useMods           = True
-    _verbose           = False
-    _version           = env("GZDOOM_LATEST_VERSION")
+    _addon              = []
+    _attempts           = -1
+    _category           = ""
+    _command            = ""
+    _compatibility      = ""
+    _configuration      = {}
+    _configurationPath  = ""
+    _demo               = -1
+    _demoPath           = ""
+    _difficulty         = SKILLS["uv"]
+    _doLaunch           = True
+    _executable         = env("GZDOOM_EXE")
+    _fast               = False
+    _files              = []
+    _iwad               = "doom2"
+    _iwadPath           = ""
+    _listAttempts       = True
+    _map                = ""
+    _mapper             = ""
+    _modDir             = ""
+    _mods               = ""
+    _noMonsters         = False
+    _player             = env("DOOM_PLAYER")
+    _practice           = False
+    _respawn            = False
+    _settings           = {}
+    _skill              = ""
+    _target             = ""
+    _targetPath         = ""
+    _warp               = ""
+    _useMods            = True
+    _verbose            = False
+    _version            = env("GZDOOM_LATEST_VERSION")
 
     def __init__(self,
                  category,
@@ -250,10 +266,12 @@ class Launch:
                  executable,
                  fast,
                  files,
+                 listAttempts,
                  map,
                  mapper,
                  noMonsters,
                  player,
+                 practice,
                  respawn,
                  skill,
                  target,
@@ -276,13 +294,15 @@ class Launch:
         self._category      = str(category).lower()
         self._compatibility = str(compatibility).lower()
         self._difficulty    = str(difficulty).lower()
-        self._demo          = str(demo)
+        self._demo          = int(demo)
         self._doLaunch      = bool(doLaunch)
         self._fast          = bool(fast)
         self._files         = list(files)
+        self._listAttempts  = bool(listAttempts)
         self._mapper        = str(mapper).title()
         self._noMonsters    = bool(noMonsters)
         self._player        = str(player).title()
+        self._practice      = bool(practice)
         self._respawn       = bool(respawn)
         self._skill         = str(skill).lower()
         self._target        = str(target).lower()
@@ -294,7 +314,7 @@ class Launch:
         self._settings[ARG_TO_SETTING["--nomonsters"]]    = self._noMonsters
         self._settings[ARG_TO_SETTING["--respawn"]]       = self._respawn
 
-        self._command         = "-record" if not self._demo else "-playdemo"
+        self._command         = "-record" if self._demo < 0 else "-playdemo"
         self._configuration   = readJson(self._configurationPath)
         self._executable      = os.path.basename(self._executablePath).split(".")[0]
         self._iwad            = getIWad(self._configuration, target)
@@ -306,16 +326,16 @@ class Launch:
         if self._iwad != self._target:
             self._files.append(self._targetPath)
 
-        self._demoPath = demoFileSetup(self._executable,
-                                       self._version,
-                                       self._player,
-                                       self._mapper,
-                                       self._target,
-                                       self._map,
-                                       self._difficulty,
-                                       self._category,
-                                       self._settings,
-                                       self._demo)
+        self._demoPath, self._attempts = demoFileSetup(self._executable,
+                                                       self._version,
+                                                       self._player,
+                                                       self._mapper,
+                                                       self._target,
+                                                       self._map,
+                                                       self._difficulty,
+                                                       self._category,
+                                                       self._settings,
+                                                       self._demo)
 
     def __str__(self):
         commandString = self.demoCommand()
@@ -340,7 +360,8 @@ class Launch:
         if extraLine and extraLine != "":
             lines.append(f"        Settings:    {extraLine}")
 
-        lines.append(f"        {self.demoCommand()}      {self.demoPath()}")
+        if self._doLaunch and not self._practice:
+            lines.append(f"        {self.demoCommand()}      {self.demoPath()}")
 
         return "\n".join(lines)
 
@@ -369,12 +390,25 @@ class Launch:
             if setting:
                 result.extend([flag])
 
-        result.extend([self.demoCommand(), self.demoPath()])
+        if not self._practice:
+            result.extend([self.demoCommand(), self.demoPath()])
 
-        if self._doLaunch:
-            return subprocess.call(result)
-        else:
+        if self._attempts >= 0 and self._listAttempts:
+            print(f"| Attempt:     #{self._attempts}.")
+
+        start = getTime(label = "| Start:       ")
+        if not self._doLaunch and not self._verbose:
             print(" ".join(result))
+            exitCode = 0
+        else:
+            exitCode = subprocess.call(result)
+        total = getTime(label = "| Finish:      ") - start
+        print(f"| Total:       {total}")
+
+        if self._demoPath:
+            print(f"Wrote demo to: {self.demoPath()}")
+
+        return exitCode
 
     def executablePath(self):
         return self._executablePath
@@ -393,6 +427,9 @@ class Launch:
 
     def iwadPath(self):
         return self._iwadPath
+
+    def practice(self):
+        return self._practice
 
     def target(self):
         return self._target
@@ -416,10 +453,15 @@ def readLaunch(argv):
                                                     default = False,
                                                     help    = "Play with fast monsters.")
 
+    parser.add_argument("-b", "--noAttempts",       action  = "store_const",
+                                                    const   = True,
+                                                    default = False,
+                                                    help    = "Don't list attempt count for current map.")
+
     parser.add_argument("-c", "--category",         default = "max",
                                                     help    = "Type of map completion type.")
 
-    parser.add_argument("-d", "--demo",             default = "",
+    parser.add_argument("-d", "--demo",             default = -1,
                                                     help    = "Run demo; argument is demo number.")
 
     parser.add_argument("-e", "--executable",       default = env("GZDOOM_EXE"),
@@ -429,8 +471,13 @@ def readLaunch(argv):
                                                     help    = "Extra files; use for testing.",
                                                     nargs   = "*")
 
-    parser.add_argument("-g", "--configuration",    default = os.path.join(os.path.dirname(sys.argv[0]), "pwads.json"),
+    parser.add_argument("-g", "--configuration",    default = os.path.join(os.path.dirname(sys.argv[0]), "../pwads.json"),
                                                     help    = "Configuration file to use.")
+
+    parser.add_argument("-i", "--practice",         action  = "store_const",
+                                                    const   = True,
+                                                    default = False,
+                                                    help    = "Don't record demo.")
 
     parser.add_argument("-m", "--map",              default = "1",
                                                     help    = "Map number.",
@@ -485,10 +532,12 @@ def readLaunch(argv):
         executable    = result.executable,
         fast          = result.fast,
         files         = result.files,
+        listAttempts  = not result.noAttempts,
         map           = result.map,
         mapper        = result.mapper,
         noMonsters    = result.nomonsters,
         player        = result.player,
+        practice      = result.practice,
         respawn       = result.respawn,
         skill         = result.skill,
         target        = result.target,
