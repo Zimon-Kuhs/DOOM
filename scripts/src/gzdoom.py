@@ -360,8 +360,8 @@ class Launch:
         if extraLine and extraLine != "":
             lines.append(f"        Settings:    {extraLine}")
 
-        if self._doLaunch and not self._practice:
-            lines.append(f"        {self.demoCommand()}      {self.demoPath()}")
+        if not self._practice:
+            lines.append(f"        {commandString}      {self.demoPath()}")
 
         return "\n".join(lines)
 
@@ -370,6 +370,9 @@ class Launch:
 
     def demoPath(self):
         return self._demoPath
+
+    def doLaunch(self):
+        return self._doLaunch and not self._practice
 
     def executable(self):
         return self._executable
@@ -397,8 +400,9 @@ class Launch:
             print(f"| Attempt:     #{self._attempts}.")
 
         start = getTime(label = "| Start:       ")
-        if not self._doLaunch and not self._verbose:
-            print(" ".join(result))
+        if not self.doLaunch:
+            if self._verbose:
+                print(" ".join(result))
             exitCode = 0
         else:
             exitCode = subprocess.call(result)
