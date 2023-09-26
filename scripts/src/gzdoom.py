@@ -11,6 +11,8 @@ ARG_TO_SETTING = {
     "--nomonsters": "nomo"
 }
 
+DEMO_POINTER = "GZDOOM_LAST_DEMO"
+
 IWADS = [ "doom", "doom2", "tnt", "plutonia" ]
 
 MOD_FILES_IGNORE = [ ".bat", ".md", ".rar", ".gz", ".txt", ".zip" ]
@@ -59,35 +61,35 @@ def demoFileSetup(executable, version, player, mapper, target, map, difficulty, 
         dirBase = os.path.join(dirBase, ".test", mapper)
 
     demoDir  = os.path.join(dirBase, target, map)
-    demoFile = "-".join([player, target, map, difficulty])
+    demoName = "-".join([player, target, map, difficulty])
 
     extraPart = ""
     for flag, setting in settings.items():
         if setting:
             extraPart = f"{extraPart}{SETTING_KEY[flag]}"
 
-    attempts = -1
+    attempt = -1
+    extension = ".lmp"
     result = ""
-    fullPath = f"{os.path.join(demoDir, demoFile)}{extraPart}-{category}"
-    if demo is None or demo < 0:
-        result, attempts = nextFile(fullPath, ".lmp")
+    fullPath = f"{os.path.join(demoDir, demoName)}{extraPart}-{category}"
 
-        if os.path.exists(result):
+    if demo is None or demo < 0:
+        attempt = currentAttempt(fullPath, extension)
+
+        if os.path.exists(demoFile(fullPath, attempt, extension)):
             raise ValueError(f"File for -record already exists. {result}")
 
         os.makedirs(demoDir, exist_ok = True)
+        return fullPath, attempt
 
-    else:
-        if not isinstance(demo, int):
-            raise ValueError(f"Demo number should be integer: {demo} ({type(demo)}).")
+    if not isinstance(demo, int):
+        raise ValueError(f"Demo number should be integer: {demo} ({type(demo)}).")
 
-        result = f"{fullPath}_{stringNumber(str(demo), 3)}.lmp"
+    result = demoFile(fullPath, demo, extension)
+    if not os.path.exists(result):
+        raise ValueError(f"File for -playdemo doesn't exist. {result}")
 
-        if not os.path.exists(result):
-            raise ValueError(f"File for -playdemo doesn't exist. {result}")
-
-
-    return f"{result}", attempts
+    return fullPath, -1
 
 
 def env(parameter):
@@ -133,15 +135,17 @@ def getPWad(target, mapper):
     return verifyFile(os.path.join(f"{env('DOOM_DIR')}", f"{targetDir}", f"{target}", f"{target}.wad"))
 
 
-def nextFile(filePath, extension):
+def demoFile(filePath, number, extension):
+    return f"{filePath}_{stringNumber(number, 3)}{extension}"
+
+
+def currentAttempt(filePath, extension):
     number = 0
-    result = f"{filePath}_{stringNumber(number, 3)}{extension}"
-
-    while os.path.exists(f"{result}"):
+    while number <= 999:
+        if not os.path.exists(f"{demoFile(filePath, number, extension)}"):
+            return number
         number += 1
-        result = f"{filePath}_{stringNumber(number, 3)}{extension}"
-
-    return result, number
+    raise ValueError("Too many demos!")
 
 
 def parseMap(mapList, iwad):
@@ -226,6 +230,7 @@ class Launch:
     _addon              = []
     _attempts           = -1
     _category           = ""
+    _clearDemo          = False
     _command            = ""
     _compatibility      = ""
     _configuration      = {}
@@ -233,7 +238,6 @@ class Launch:
     _demo               = -1
     _demoPath           = ""
     _difficulty         = SKILLS["uv"]
-    _doLaunch           = True
     _executable         = env("GZDOOM_EXE")
     _fast               = False
     _files              = []
@@ -244,6 +248,7 @@ class Launch:
     _mapper             = ""
     _modDir             = ""
     _mods               = ""
+    _noLaunch           = False
     _noMonsters         = False
     _player             = env("DOOM_PLAYER")
     _practice           = False
@@ -252,6 +257,7 @@ class Launch:
     _skill              = ""
     _target             = ""
     _targetPath         = ""
+    _track              = -1
     _warp               = ""
     _useMods            = True
     _verbose            = False
@@ -259,22 +265,24 @@ class Launch:
 
     def __init__(self,
                  category,
+                 clearDemo,
                  compatibility,
                  demo,
                  configuration,
-                 doLaunch,
                  executable,
                  fast,
                  files,
                  listAttempts,
                  map,
                  mapper,
+                 noLaunch,
                  noMonsters,
                  player,
                  practice,
                  respawn,
                  skill,
                  target,
+                 track,
                  useMods,
                  verbose,
                  version):
@@ -292,10 +300,11 @@ class Launch:
         self._targetPath        = verifyFile(targetPath)
 
         self._category      = str(category).lower()
+        self._clearDemo     = bool(clearDemo)
         self._compatibility = str(compatibility).lower()
         self._difficulty    = str(difficulty).lower()
         self._demo          = int(demo)
-        self._doLaunch      = bool(doLaunch)
+        self._noLaunch      = bool(noLaunch)
         self._fast          = bool(fast)
         self._files         = list(files)
         self._listAttempts  = bool(listAttempts)
@@ -306,6 +315,7 @@ class Launch:
         self._respawn       = bool(respawn)
         self._skill         = str(skill).lower()
         self._target        = str(target).lower()
+        self._track         = int(track)
         self._version       = str(version).lower()
         self._useMods       = bool(useMods)
         self._verbose       = bool(verbose)
@@ -349,6 +359,7 @@ class Launch:
         lines.append(f"        -iwad:       {self.iwadPath()}")
         lines.append(f"        -skill:      {self.skill()}")
         lines.append(f"        -warp:       {self.warp()}")
+        lines.append(f"        +idmus:      {self.track()}")
 
         extraLine = ""
         prefix = ""
@@ -365,21 +376,52 @@ class Launch:
 
         return "\n".join(lines)
 
+    def attempts(self):
+        return self._attempts
+
+    def clearDemo(self):
+        return self._clearDemo and self.attempts() > 0
+
+    def customAction(self):
+        return len(self.customActions()) > 0
+
+    def customActions(self):
+        result = []
+        if self.clearDemo():
+            result.append("--clearDemo")
+        return result
+
+    def demo(self):
+        return self._demo
+
+    def doDemo(self):
+        return self.demo() != -1
+
     def demoCommand(self):
         return self._command
 
     def demoPath(self):
-        return self._demoPath
-
-    def doLaunch(self):
-        return self._doLaunch and not self._practice
+        return f"{self._demoPath}_{stringNumber(self.attempts(), 3)}.lmp"
 
     def executable(self):
         return self._executable
 
     def execute(self):
-        if self._verbose:
-            print(self)
+        """
+            TODO:
+                - Delegate actions.
+        """
+
+        attempts = self.attempts()
+        clearDemo = self.clearDemo()
+        demoPath = self.demoPath()
+        isRunning = self.launch()
+        isPractice = self.practice()
+        musicTrack = self.track()
+        printAttempts = self.listAttempts()
+        recordDemo = self.record()
+
+        self.say(self)
 
         result = []
         result.append(self.executablePath())
@@ -393,35 +435,42 @@ class Launch:
             if setting:
                 result.extend([flag])
 
-        if not self._practice:
+        if not isPractice:
             result.extend([self.demoCommand(), self.demoPath()])
 
-        if self._attempts >= 0 and self._listAttempts:
-            print(f"| Attempt:     #{self._attempts}.")
+        if musicTrack:
+            result.extend(["+set idmus", self.track()])
+
+        if printAttempts:
+            print(f"| Attempt:     #{attempts}.")
 
         start = getTime(label = "| Start:       ")
-        if not self.doLaunch:
-            if self._verbose:
-                print(" ".join(result))
+        if clearDemo:
+            print("Clearing demo...")
+            exitCode = subprocess.call(["rm", "-f", self.demoPath()])
+        elif not isRunning:
+            self.say(" ".join(result))
             exitCode = 0
         else:
+            print("Running...")
             exitCode = subprocess.call(result)
+            os.environ[DEMO_POINTER] = demoPath
         total = getTime(label = "| Finish:      ") - start
         print(f"| Total:       {total}")
 
-        if self._demoPath:
-            print(f"Wrote demo to: {self.demoPath()}")
+        if recordDemo and isRunning:
+            print(f"Wrote demo to: {demoPath}")
 
         return exitCode
-
-    def executablePath(self):
-        return self._executablePath
 
     def compatibility(self):
         return self._compatibility
 
     def difficulty(self):
         return self._difficulty
+
+    def executablePath(self):
+        return self._executablePath
 
     def files(self):
         return self._files
@@ -432,8 +481,21 @@ class Launch:
     def iwadPath(self):
         return self._iwadPath
 
+    def launch(self):
+        return not (self._noLaunch or self.customAction())
+
+    def listAttempts(self):
+        return self._listAttempts
+
     def practice(self):
         return self._practice
+
+    def record(self):
+        return not self.practice() and self._demo == -1
+
+    def say(self, message):
+        if (self.verbose()):
+            print(message)
 
     def target(self):
         return self._target
@@ -441,11 +503,17 @@ class Launch:
     def targetPath(self):
         return self._targetPath
 
+    def track(self):
+        return str(self._track)
+
     def skill(self):
         return self._skill
 
     def warp(self):
         return [str(number) for number in self._warp]
+
+    def verbose(self):
+        return self._verbose
 
 
 def readLaunch(argv):
@@ -482,6 +550,14 @@ def readLaunch(argv):
                                                     const   = True,
                                                     default = False,
                                                     help    = "Don't record demo.")
+
+    parser.add_argument("-k", "--track",            default = 0,
+                                                    help    = "Use music from this level number.")
+
+    parser.add_argument("-l", "--clearLastDemo",    action  = "store_const",
+                                                    const   = True,
+                                                    default = False,
+                                                    help    = "Clear last demo.")
 
     parser.add_argument("-m", "--map",              default = "1",
                                                     help    = "Map number.",
@@ -529,22 +605,24 @@ def readLaunch(argv):
 
     return Launch(
         category      = result.category,
+        clearDemo     = result.clearLastDemo,
         compatibility = result.compatibility,
         configuration = result.configuration,
         demo          = result.demo,
-        doLaunch      = not result.noLaunch,
         executable    = result.executable,
         fast          = result.fast,
         files         = result.files,
         listAttempts  = not result.noAttempts,
         map           = result.map,
         mapper        = result.mapper,
+        noLaunch      = result.noLaunch,
         noMonsters    = result.nomonsters,
         player        = result.player,
         practice      = result.practice,
         respawn       = result.respawn,
         skill         = result.skill,
         target        = result.target,
+        track         = result.track,
         useMods       = not result.unmodded,
         verbose       = result.verbose,
         version       = result.version,
