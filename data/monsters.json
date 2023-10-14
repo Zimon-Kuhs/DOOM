@@ -1,0 +1,80 @@
+{
+    "Ultimate DOOM": {
+        "Baron of Hell": {
+            "HP": 1000
+        },
+        "Cacodemon": {
+            "HP": 400
+        },
+        "Cyberdemon": {
+            "HP": 4000
+        },
+        "Lost Soul": {
+            "HP": 100
+        },
+        "Imp": {
+            "HP": 60
+        },
+        "Demon": {
+            "HP": 20
+        },
+        "Shotgun Guy": {
+            "HP": 30
+        },
+        "Spectre": {
+            "Copy Of": "Demon",
+            "Modifier": "Invisible"
+        },
+        "Spiderdemon": {
+            "HP": 20
+        },
+        "Zombieman": {
+            "HP": 20
+        }
+    },
+    "DOOM 2": {
+        "Arachnotron": {
+            "HP": 500
+        },
+        "Arch-Vile": {
+            "HP": 700
+        },
+        "Commander Keen": {
+            "HP": 100
+        },
+        "Heavy Weapon Dude": {
+            "HP": 70
+        },
+        "Hell Knight": {
+            "Copy Of": "Baron of Hell",
+            "HP": 0.5
+        },
+        "Mancubus": {
+            "HP": 600
+        },
+        "Pain Elemental": {
+            "HP": 400
+        },
+        "Revenant": {
+            "HP": 300
+        },
+        "Romero's Head": {
+            "HP": 250
+        },
+        "Wolfenstein SS": {
+            "HP": 50
+        }
+    },
+    "DOOM 64": {
+        "Nightmare Imp": {
+            "Copy Of": "Imp",
+            "Movement": 2,
+            "Projectile" : {
+                "Speed": 2
+            }
+        },
+        "Mother Demon": {
+            "HP": 5000
+        }
+    }
+}

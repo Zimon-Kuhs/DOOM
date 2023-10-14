@@ -23,6 +23,8 @@
         "music": [ "ml_midipack_crispydoom.wad" ],
         "short": "ml"
     },
+    "mm2": {
+    },
     "plutonia": {
         "iwad":  "plutonia",
         "music": [ "plutmidi.wad", "plutmidi-np.wad" ],

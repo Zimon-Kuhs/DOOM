@@ -11,11 +11,17 @@ ARG_TO_SETTING = {
     "--nomonsters": "nomo"
 }
 
+CUSTOM_ACTIONS = [ action.lower() for action in [
+    "clearDemo",
+    "listPWADs"
+]]
+
 DEMO_POINTER = "GZDOOM_LAST_DEMO"
 
 IWADS = [ "doom", "doom2", "tnt", "plutonia" ]
 
-MOD_FILES_IGNORE = [ ".bat", ".md", ".rar", ".gz", ".txt", ".zip" ]
+MOD_FILES_IGNORE = [ "bat", "exe", "gz", "md", "rar", "txt", "zip" ]
+MOD_FILES_IGNORE += [ f".{extension}" for extension in MOD_FILES_IGNORE ]
 
 SPECIAL_MAPPERS = {
     "Cinnamon": "zwad",
@@ -52,6 +58,19 @@ def autoLoad(modDir):
         result.append(fullPath)
 
     return result
+
+
+def currentAttempt(filePath, extension):
+    number = 0
+    while number <= 999:
+        if not os.path.exists(f"{demoFile(filePath, number, extension)}"):
+            return number
+        number += 1
+    raise ValueError("Too many demos!")
+
+
+def demoFile(filePath, number, extension):
+    return f"{filePath}_{stringNumber(number, 3)}{extension}"
 
 
 def demoFileSetup(executable, version, player, mapper, target, map, difficulty, category, settings, demo):
@@ -132,25 +151,32 @@ def getPWad(target, mapper):
     if isTwad or isSwad:
         targetDir = os.path.join(targetDir, mapper)
 
-    return verifyFile(os.path.join(f"{env('DOOM_DIR')}", f"{targetDir}", f"{target}", f"{target}.wad"))
+    pwadDir = verifyDir(os.path.join(f"{env('DOOM_DIR')}", f"{targetDir}", f"{target}"))
+    pwad = verifyFile(os.path.join(pwadDir, f"{target}.wad"))
+    extraFiles = []
+
+    for name in os.listdir(pwadDir):
+        fullPath = os.path.join(pwadDir, name)
+        if os.path.isfile(fullPath) and name.split(".")[-1] not in MOD_FILES_IGNORE :
+            extraFiles.append(fullPath)
+
+    return pwad, extraFiles
 
 
-def demoFile(filePath, number, extension):
-    return f"{filePath}_{stringNumber(number, 3)}{extension}"
 
-
-def currentAttempt(filePath, extension):
-    number = 0
-    while number <= 999:
-        if not os.path.exists(f"{demoFile(filePath, number, extension)}"):
-            return number
-        number += 1
-    raise ValueError("Too many demos!")
+def getTime(label="Start: "):
+    current = datetime.datetime.now().replace(microsecond = 0)
+    print(f"{label}{current.strftime('%H:%M:%S')}")
+    return current
 
 
 def parseMap(mapList, iwad):
+    if not mapList:
+        mapList = [ "1", "1" ] if iwad == "doom" else [ "01" ]
+
     amount = len(mapList)
-    if amount <= 0 or amount > 2:
+
+    if amount > 2:
         raise ValueError(f"Invalid map numbers: {mapList}")
 
     if amount == 1 and iwad == "doom" or amount == 2 and iwad != "doom":
@@ -163,10 +189,20 @@ def parseMap(mapList, iwad):
     return "map" + ("0" if numbers[0] < 10 else "") + str(numbers[0]), numbers
 
 
-def getTime(label="Start: "):
-    current = datetime.datetime.now().replace(microsecond = 0)
-    print(f"{label}{current.strftime('%H:%M:%S')}")
-    return current
+def printPWADList(pwads):
+    header = "PWADs"
+    prefix = "    "
+    prefixLength = len(prefix)
+    headerLength = len(header)
+    width = max([len(pwad) for pwad in pwads]) + prefixLength
+
+    adjust = int((width - headerLength + 1) / 2 + prefixLength / 2)
+    line = '-' * (adjust - 1)
+
+    print(f"{line} {header} {line}")
+    for pwad in sorted(pwads):
+        print(f"{prefix}{pwad}")
+    print('-' * (width + headerLength))
 
 
 def readJson(filePath):
@@ -175,6 +211,8 @@ def readJson(filePath):
 
 
 def readMods(configuration, sourceDir, targetWad):
+    result = []
+
     modKeys = [ "music", "mods" ]
 
     if not configuration:
@@ -187,7 +225,6 @@ def readMods(configuration, sourceDir, targetWad):
     if targetWad not in configuration:
         return []
 
-    result = []
     for modKey in modKeys:
         if modKey not in configuration[targetWad]:
             continue
@@ -199,7 +236,6 @@ def readMods(configuration, sourceDir, targetWad):
             if not os.path.isfile(fullPath) or os.path.splitext(file) in MOD_FILES_IGNORE:
                 continue
             result.append(fullPath)
-
     return result
 
 
@@ -235,8 +271,10 @@ class Launch:
     _compatibility      = ""
     _configuration      = {}
     _configurationPath  = ""
+    _customActions      = []
     _demo               = -1
     _demoPath           = ""
+    _defaultFiles       = []
     _difficulty         = SKILLS["uv"]
     _executable         = env("GZDOOM_EXE")
     _fast               = False
@@ -265,8 +303,9 @@ class Launch:
 
     def __init__(self,
                  category,
-                 clearDemo,
+                 customActions,
                  compatibility,
+                 defaultFiles,
                  demo,
                  configuration,
                  executable,
@@ -287,11 +326,11 @@ class Launch:
                  verbose,
                  version):
 
-        addonPath         = os.path.join(os.path.dirname(self._executable), "addon")
-        executablePath    = str(executable)
-        modPath           = os.path.join(os.path.dirname(self._executable), "mod")
-        skill, difficulty = SKILLS[str(skill)]
-        targetPath        = getPWad(target, mapper)
+        addonPath               = os.path.join(os.path.dirname(self._executable), "addon")
+        executablePath          = str(executable)
+        modPath                 = os.path.join(os.path.dirname(self._executable), "mod")
+        skill, difficulty       = SKILLS[str(skill)]
+        targetPath, extraFiles  = getPWad(target, mapper)
 
         self._addon             = verifyDir(addonPath)
         self._configurationPath = verifyFile(configuration)
@@ -300,8 +339,8 @@ class Launch:
         self._targetPath        = verifyFile(targetPath)
 
         self._category      = str(category).lower()
-        self._clearDemo     = bool(clearDemo)
         self._compatibility = str(compatibility).lower()
+        self._defaultFiles  = bool(defaultFiles)
         self._difficulty    = str(difficulty).lower()
         self._demo          = int(demo)
         self._noLaunch      = bool(noLaunch)
@@ -326,12 +365,15 @@ class Launch:
 
         self._command         = "-record" if self._demo < 0 else "-playdemo"
         self._configuration   = readJson(self._configurationPath)
+        self._customActions   = [ str(action).lower() for action in customActions ]
+        self._defaultFiles    = extraFiles if bool(defaultFiles) else []
         self._executable      = os.path.basename(self._executablePath).split(".")[0]
         self._iwad            = getIWad(self._configuration, target)
         self._iwadPath        = verifyFile(os.path.join(env("DOOM_IWAD_DIR"), self._iwad, f"{self._iwad}.wad"))
         self._map, self._warp = parseMap(map, self._iwad)
         self._mods            = readMods(self._configuration, self._modDir, self._target) + autoLoad(self._addon)
 
+        self._files += self._defaultFiles
         self._files += self._mods
         if self._iwad != self._target:
             self._files.append(self._targetPath)
@@ -348,6 +390,13 @@ class Launch:
                                                        self._demo)
 
     def __str__(self):
+        actions = self.customActions()
+        if actions:
+            lines = [ "Custom actions:" ]
+            for action in actions:
+                lines.append(f"    {action}")
+            return "\n".join(lines)
+
         commandString = self.demoCommand()
         commandString = commandString + ("" if len(commandString) == 9 else "  ")
 
@@ -376,20 +425,27 @@ class Launch:
 
         return "\n".join(lines)
 
+    def addCustomAction(self, action):
+        key = action.lower()
+        if key not in self._customActions:
+            self._customActions.append(key)
+
     def attempts(self):
         return self._attempts
 
     def clearDemo(self):
-        return self._clearDemo and self.attempts() > 0
+        path = self.demoPath()
+        if self.attempts() == 0 or not os.path.exists(path):
+            print(f"No demo {path} to remove.")
+            return
+        os.remove(path)
+        print(f"Removed {path}.")
 
     def customAction(self):
         return len(self.customActions()) > 0
 
     def customActions(self):
-        result = []
-        if self.clearDemo():
-            result.append("--clearDemo")
-        return result
+        return [ action for action in self._customActions ]
 
     def demo(self):
         return self._demo
@@ -412,8 +468,14 @@ class Launch:
                 - Delegate actions.
         """
 
+        if self.customAction():
+            if self.isCustomAction("clearDemo"):
+                self.clearDemo()
+            if self.isCustomAction("listPWADs"):
+                self.listPWADs()
+            return 0
+
         attempts = self.attempts()
-        clearDemo = self.clearDemo()
         demoPath = self.demoPath()
         isRunning = self.launch()
         isPractice = self.practice()
@@ -445,18 +507,16 @@ class Launch:
             print(f"| Attempt:     #{attempts}.")
 
         start = getTime(label = "| Start:       ")
-        if clearDemo:
-            print("Clearing demo...")
-            exitCode = subprocess.call(["rm", "-f", self.demoPath()])
-        elif not isRunning:
+
+        if not isRunning:
             self.say(" ".join(result))
             exitCode = 0
         else:
             print("Running...")
             exitCode = subprocess.call(result)
             os.environ[DEMO_POINTER] = demoPath
-        total = getTime(label = "| Finish:      ") - start
-        print(f"| Total:       {total}")
+            total = getTime(label = "| Finish:      ") - start
+            print(f"| Total:       {total}")
 
         if recordDemo and isRunning:
             print(f"Wrote demo to: {demoPath}")
@@ -475,6 +535,9 @@ class Launch:
     def files(self):
         return self._files
 
+    def isCustomAction(self, action):
+        return action.lower() in self._customActions
+
     def iwad(self):
         return self._iwad
 
@@ -486,6 +549,28 @@ class Launch:
 
     def listAttempts(self):
         return self._listAttempts
+
+    def listPWADs(self):
+        pwadDir = os.path.join(env('DOOM_PWAD_DIR'))
+        if not os.path.exists(pwadDir):
+            raise FileNotFoundError(f"Invalid PWAD dir: {pwadDir}")
+
+        dumbFiles = []
+        dumbDirs = []
+        pwads = []
+        for name in os.listdir(pwadDir):
+            fullPath = os.path.join(pwadDir, name)
+            if not os.path.isdir(fullPath):
+                dumbFiles.append(fullPath)
+                continue
+            pwad = os.path.join(fullPath, f"{name}.wad")
+            if not os.path.exists(pwad):
+                dumbDirs.append(fullPath)
+                continue
+            pwads.append(name)
+
+        printPWADList(pwads)
+
 
     def practice(self):
         return self._practice
@@ -551,15 +636,19 @@ def readLaunch(argv):
                                                     default = False,
                                                     help    = "Don't record demo.")
 
+    parser.add_argument("-j", "--noDefaultFiles",   action  = "store_const",
+                                                    const   = True,
+                                                    default = False,
+                                                    help    = "Don't include all compatible files in WAD directory.")
+
     parser.add_argument("-k", "--track",            default = 0,
                                                     help    = "Use music from this level number.")
 
-    parser.add_argument("-l", "--clearLastDemo",    action  = "store_const",
-                                                    const   = True,
-                                                    default = False,
-                                                    help    = "Clear last demo.")
+    parser.add_argument("-l", "--customActions",    default = [],
+                                                    nargs   = "*",
+                                                    help    = f"Custom actions: <{'|'.join(CUSTOM_ACTIONS)}>.")
 
-    parser.add_argument("-m", "--map",              default = "1",
+    parser.add_argument("-m", "--map",              default = [],
                                                     help    = "Map number.",
                                                     nargs   = "+")
 
@@ -603,12 +692,17 @@ def readLaunch(argv):
 
     result = parser.parse_args(argv)
 
+    errorActions = [ action for action in result.customActions if action.lower() not in CUSTOM_ACTIONS ]
+    if errorActions:
+        raise ValueError(f"No such action{'' if len(errorActions) == 1 else 's'}: {', '.join(errorActions)}.")
+
     return Launch(
         category      = result.category,
-        clearDemo     = result.clearLastDemo,
         compatibility = result.compatibility,
         configuration = result.configuration,
+        customActions = result.customActions,
         demo          = result.demo,
+        defaultFiles  = not result.noDefaultFiles,
         executable    = result.executable,
         fast          = result.fast,
         files         = result.files,
