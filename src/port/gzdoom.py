@@ -628,7 +628,7 @@ def readLaunch(argv):
                                                     help    = "Extra files; use for testing.",
                                                     nargs   = "*")
 
-    parser.add_argument("-g", "--configuration",    default = os.path.join(os.path.dirname(sys.argv[0]), "../pwads.json"),
+    parser.add_argument("-g", "--configuration",    default = os.path.join(env("DOOM_DIR"), "data", "pwads.json"),
                                                     help    = "Configuration file to use.")
 
     parser.add_argument("-i", "--practice",         action  = "store_const",

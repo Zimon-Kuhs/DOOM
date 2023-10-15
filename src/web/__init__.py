@@ -1,1 +1,1 @@
-from . import page
+import driveDemos, readWiki

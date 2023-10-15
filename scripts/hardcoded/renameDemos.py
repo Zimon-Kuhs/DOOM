@@ -1,6 +1,8 @@
 import os
 
 if __name__ == "__main__":
+    raise NotImplementedError(f"{__name__} is not implemented.")
+
     directory = os.path.dirname(__file__)
     for subDir in os.listdir(directory):
         if not os.path.isdir(subDir):

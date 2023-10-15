@@ -1,9 +1,10 @@
+raise NotImplementedError(f"{__file__} is not implemented.")
+
 import getopt
 import os
 import sys
 
-from log import say
-from web import page
+from web import readWiki
 import monster
 
 
@@ -14,7 +15,7 @@ def usage(scriptName = os.path.basename(__file__), exitCode = 0):
         @param exitCode The exit code to return.
     """
 
-    say(f"{scriptName} HOST", always = True)
+    print(f"{scriptName} HOST")
     sys.exit(exitCode)
 
 
@@ -37,7 +38,7 @@ if __name__ == "__main__":
         else:
             usage()
 
-    data = page.levelData(website)
+    data = readWiki.levelData(website)
     monsters = monster.parse("data/monsters.json")
 
     hp = {}

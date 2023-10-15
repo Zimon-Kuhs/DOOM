@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+raise NotImplementedError(f"{__file__} is not implemented.")
+
 import os.path
 import sys
 
@@ -105,6 +107,5 @@ def findNexts(progress, errors):
     for wadName, maps in progress.items():
         types[wadName] = "doom" if maps[0][0] == "e" else "doom2"
 
-if __name__ == '__main__':
-    argv = sys.argv[1:]
-    print(findNext(argv[0]))
+def driveDemos():
+    raise NotImplementedError(f"{__name__} is not implemented.")

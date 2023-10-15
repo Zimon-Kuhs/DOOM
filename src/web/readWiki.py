@@ -1,5 +1,6 @@
-import requests
+raise NotImplementedError(f"{__file__} is not implemented.")
 
+import requests
 
 def text(url):
     return requests.get(url).text
@@ -116,3 +117,7 @@ def levelData(url):
         single[name] = readCategory(value)
 
     return single
+
+
+if __name__ == "__main__":
+    raise NotImplementedError(f"{__name__} is not implemented.")

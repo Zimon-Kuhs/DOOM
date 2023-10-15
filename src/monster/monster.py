@@ -1,7 +1,9 @@
+raise NotImplementedError(f"{__file__} is not implemented.")
+
 import json
 import sys
 
-from web import page
+from web import readWiki
 
 
 def getOptional(dictionary, key):
