@@ -47,6 +47,19 @@ SKILLS = {
     "nm":    (5, "nm"),     "5": (5, "nm")
 }
 
+def annoy():
+    countFile = os.path.join(env("HOME"), "doc", "annoy", "count.txt")
+    if not os.path.exists(countFile):
+        with open(countFile, "w", encoding = "utf-8") as output:
+            output.write("0")
+
+    count = 0
+    with open(countFile, "r", encoding = "utf-8") as input:
+        count = int(input.readline().strip())
+
+    print(f"You should refactor. You have ignored this {count} times.")
+    with open(countFile, "w", encoding = "utf-8") as output:
+        output.write(str(count + 1))
 
 def autoLoad(modDir):
     result = []
@@ -281,7 +294,6 @@ class Launch:
     _files              = []
     _iwad               = "doom2"
     _iwadPath           = ""
-    _listAttempts       = True
     _map                = ""
     _mapper             = ""
     _modDir             = ""
@@ -311,7 +323,6 @@ class Launch:
                  executable,
                  fast,
                  files,
-                 listAttempts,
                  map,
                  mapper,
                  noLaunch,
@@ -326,11 +337,24 @@ class Launch:
                  verbose,
                  version):
 
+        self._customActions  = [ str(action).lower() for action in customActions ]
+
+        if self.customAction():
+            if self.isCustomAction("clearDemo"):
+                self.clearDemo()
+            if self.isCustomAction("listAttempts"):
+                self.listAttempts()
+            if self.isCustomAction("listPWADs"):
+                self.listPWADs()
+            return 0
+
+
         addonPath               = os.path.join(os.path.dirname(self._executable), "addon")
         executablePath          = str(executable)
         modPath                 = os.path.join(os.path.dirname(self._executable), "mod")
         skill, difficulty       = SKILLS[str(skill)]
         targetPath, extraFiles  = getPWad(target, mapper)
+
 
         self._addon             = verifyDir(addonPath)
         self._configurationPath = verifyFile(configuration)
@@ -346,7 +370,6 @@ class Launch:
         self._noLaunch      = bool(noLaunch)
         self._fast          = bool(fast)
         self._files         = list(files)
-        self._listAttempts  = bool(listAttempts)
         self._mapper        = str(mapper).title()
         self._noMonsters    = bool(noMonsters)
         self._player        = str(player).title()
@@ -365,7 +388,6 @@ class Launch:
 
         self._command         = "-record" if self._demo < 0 else "-playdemo"
         self._configuration   = readJson(self._configurationPath)
-        self._customActions   = [ str(action).lower() for action in customActions ]
         self._defaultFiles    = extraFiles if bool(defaultFiles) else []
         self._executable      = os.path.basename(self._executablePath).split(".")[0]
         self._iwad            = getIWad(self._configuration, target)
@@ -433,13 +455,8 @@ class Launch:
     def attempts(self):
         return self._attempts
 
-    def clearDemo(self):
-        path = self.demoPath()
-        if self.attempts() == 0 or not os.path.exists(path):
-            print(f"No demo {path} to remove.")
-            return
-        os.remove(path)
-        print(f"Removed {path}.")
+    def compatibility(self):
+        return self._compatibility
 
     def customAction(self):
         return len(self.customActions()) > 0
@@ -462,25 +479,22 @@ class Launch:
     def executable(self):
         return self._executable
 
+    def difficulty(self):
+        return self._difficulty
+
     def execute(self):
         """
             TODO:
                 - Delegate actions.
         """
 
-        if self.customAction():
-            if self.isCustomAction("clearDemo"):
-                self.clearDemo()
-            if self.isCustomAction("listPWADs"):
-                self.listPWADs()
-            return 0
+        annoy()
 
         attempts = self.attempts()
         demoPath = self.demoPath()
         isRunning = self.launch()
         isPractice = self.practice()
         musicTrack = self.track()
-        printAttempts = self.listAttempts()
         recordDemo = self.record()
 
         self.say(self)
@@ -503,8 +517,7 @@ class Launch:
         if musicTrack:
             result.extend(["+set idmus", self.track()])
 
-        if printAttempts:
-            print(f"| Attempt:     #{attempts}.")
+        print(f"| Attempt:     #{attempts}.")
 
         start = getTime(label = "| Start:       ")
 
@@ -523,12 +536,6 @@ class Launch:
 
         return exitCode
 
-    def compatibility(self):
-        return self._compatibility
-
-    def difficulty(self):
-        return self._difficulty
-
     def executablePath(self):
         return self._executablePath
 
@@ -546,31 +553,6 @@ class Launch:
 
     def launch(self):
         return not (self._noLaunch or self.customAction())
-
-    def listAttempts(self):
-        return self._listAttempts
-
-    def listPWADs(self):
-        pwadDir = os.path.join(env('DOOM_PWAD_DIR'))
-        if not os.path.exists(pwadDir):
-            raise FileNotFoundError(f"Invalid PWAD dir: {pwadDir}")
-
-        dumbFiles = []
-        dumbDirs = []
-        pwads = []
-        for name in os.listdir(pwadDir):
-            fullPath = os.path.join(pwadDir, name)
-            if not os.path.isdir(fullPath):
-                dumbFiles.append(fullPath)
-                continue
-            pwad = os.path.join(fullPath, f"{name}.wad")
-            if not os.path.exists(pwad):
-                dumbDirs.append(fullPath)
-                continue
-            pwads.append(name)
-
-        printPWADList(pwads)
-
 
     def practice(self):
         return self._practice
@@ -599,6 +581,43 @@ class Launch:
 
     def verbose(self):
         return self._verbose
+
+# ******************************************************************************************************************** #
+#    Custom actions.
+# ******************************************************************************************************************** #
+
+    def clearDemo(self):
+        path = self.demoPath()
+        if self.attempts() == 0 or not os.path.exists(path):
+            print(f"No demo {path} to remove.")
+            return
+        os.remove(path)
+        print(f"Removed {path}.")
+
+    def listAttempts(self):
+        return ""
+
+    def listPWADs(self):
+        pwadDir = os.path.join(env('DOOM_PWAD_DIR'))
+        if not os.path.exists(pwadDir):
+            raise FileNotFoundError(f"Invalid PWAD dir: {pwadDir}")
+
+        dumbFiles = []
+        dumbDirs = []
+        pwads = []
+
+        for name in os.listdir(pwadDir):
+            fullPath = os.path.join(pwadDir, name)
+            if not os.path.isdir(fullPath):
+                dumbFiles.append(fullPath)
+                continue
+            pwad = os.path.join(fullPath, f"{name}.wad")
+            if not os.path.exists(pwad):
+                dumbDirs.append(fullPath)
+                continue
+            pwads.append(name)
+
+        printPWADList(pwads)
 
 
 def readLaunch(argv):
@@ -706,7 +725,6 @@ def readLaunch(argv):
         executable    = result.executable,
         fast          = result.fast,
         files         = result.files,
-        listAttempts  = not result.noAttempts,
         map           = result.map,
         mapper        = result.mapper,
         noLaunch      = result.noLaunch,

@@ -25,6 +25,9 @@
     },
     "mm2": {
     },
+    "nrftl": {
+        "music" : [ "nrftl_midipack_zdoom.wad" ]
+    },
     "plutonia": {
         "iwad":  "plutonia",
         "music": [ "plutmidi.wad", "plutmidi-np.wad" ],
